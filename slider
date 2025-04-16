@@ -1,0 +1,95 @@
+from PySide2.QtWidgets import QWidget, QApplication
+from PySide2.QtGui import QPainter, QColor, QVector2D, QTransform
+from PySide2.QtCore import Qt, QPointF, QPoint
+import maya.cmds as cmds
+import math
+
+class Slider(QWidget):
+    def __init__(self, target, attribute1, attribute2, rangeMin, rangeMax, angle):
+        super().__init__()
+        self.target = target
+        self.attribute1 = attribute1
+        self.attribute2 = attribute2
+        self.ctrlRange = 100
+        self.rangeMin = rangeMin
+        self.rangeMax = rangeMax
+        self.circle_pos = QPointF(
+            self.ctrlRange + self.ctrlRange * math.cos(math.radians(angle) + math.pi),
+            self.ctrlRange + self.ctrlRange * math.sin(math.radians(angle) + math.pi)
+        )
+
+        self.angleInRadians = math.radians(angle)
+        self.dragging = False
+        self.BackGround = True
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Draw background
+        painter.setBrush(QColor(90, 90, 90))
+        painter.drawRect(self.rect())
+
+        # Calculate the start and end points of the line based on the angle
+        start_x = self.ctrlRange + self.ctrlRange * math.cos(self.angleInRadians + math.pi)  # Adjust for the corner
+        start_y = self.ctrlRange + self.ctrlRange * math.sin(self.angleInRadians + math.pi)
+        end_x = self.ctrlRange + self.ctrlRange * math.cos(self.angleInRadians)  # End point in the opposite direction
+        end_y = self.ctrlRange + self.ctrlRange * math.sin(self.angleInRadians)
+
+        # Draw line along the calculated angle
+        painter.setPen(QColor(180, 180, 180))  # Set line color
+        painter.drawLine(QPointF(start_x, start_y), QPointF(end_x, end_y))
+
+        # Draw draggable circle
+        painter.setBrush(QColor(100, 100, 250))
+        painter.drawEllipse(self.circle_pos, 10, 10)
+
+    def mousePressEvent(self, event):
+        if (self.circle_pos - QPointF(event.pos())).manhattanLength() < 20:
+            self.dragging = True
+
+    def setRange(self, value):
+        #scaled_value = (value - from_min) / (from_max - from_min)
+        scale = value/100
+        mapped_value = scale * (self.rangeMax - self.rangeMin) + self.rangeMin
+        return mapped_value
+
+    def updateTarget(self, x, y):
+        cmds.setAttr("{}.{}".format(self.target, self.attribute1), self.setRange(x))
+        cmds.setAttr("{}.{}".format(self.target, self.attribute2), self.setRange(y))
+
+    def mouseMoveEvent(self, event):
+        if self.dragging:
+            # Define the starting corner point based on the angle
+            corner_x = self.ctrlRange + self.ctrlRange * math.cos(self.angleInRadians + math.pi)
+            corner_y = self.ctrlRange + self.ctrlRange * math.sin(self.angleInRadians + math.pi)
+            corner_point = QPointF(corner_x, corner_y)
+
+            # Define the opposite corner point
+            opposite_x = self.ctrlRange + self.ctrlRange * math.cos(self.angleInRadians)
+            opposite_y = self.ctrlRange + self.ctrlRange * math.sin(self.angleInRadians)
+            opposite_point = QPointF(opposite_x, opposite_y)
+
+            # Calculate the projection of the mouse position onto the line between the corners
+            event_pos = QPointF(event.pos())  # Convert QPoint to QPointF
+            line_vector = QVector2D(opposite_point - corner_point)
+            event_vector = QVector2D(event_pos - corner_point)
+
+            # Compute the scalar projection of the event vector onto the line vector
+            t = QVector2D.dotProduct(event_vector, line_vector) / line_vector.lengthSquared()
+            t = max(0, min(1, t))  # Clamp t to keep the movement within bounds
+
+            # Calculate the projected point along the line
+            projected_point = corner_point + t * line_vector.toPointF()
+
+            # Update the circle's position to the projected point
+            self.circle_pos = projected_point
+
+            # Update the widget and target attributes
+            self.update()
+            self.updateTarget(self.circle_pos.x(), self.circle_pos.y())
+
+    def mouseReleaseEvent(self, event):
+        self.dragging = False
+
+
