@@ -1,0 +1,61 @@
+from PySide2.QtWidgets import QWidget, QApplication
+from PySide2.QtGui import QPainter, QColor, QVector2D
+from PySide2.QtCore import Qt, QPointF
+import maya.cmds as cmds
+
+class Joystick(QWidget):
+    def __init__(self, target, attribute1, attribute2, rangeMin, rangeMax):
+        super().__init__()
+        self.target = target
+        self.attribute1 = attribute1
+        self.attribute2 = attribute2
+        self.ctrlRange = 100
+        self.rangeMin = rangeMin
+        self.rangeMax = rangeMax
+        self.circle_pos = QPointF(self.ctrlRange, self.ctrlRange)
+        self.dragging = False
+        self.BackGround = True
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Draw background
+        painter.setBrush(QColor(90, 90, 90))
+        painter.drawRect(self.rect())
+
+        # Draw joystick base
+        if self.BackGround:
+            painter.setBrush(QColor(180, 180, 180))
+            painter.drawEllipse(0, 0, self.ctrlRange*2, self.ctrlRange*2)
+
+        # Draw draggable circle
+        painter.setBrush(QColor(100, 100, 250))
+        painter.drawEllipse(self.circle_pos, 10, 10)
+
+    def mousePressEvent(self, event):
+        if (self.circle_pos - QPointF(event.pos())).manhattanLength() < 20:
+            self.dragging = True
+
+    def setRange(self, value):
+        #scaled_value = (value - from_min) / (from_max - from_min)
+        scale = value/100
+        mapped_value = scale * (self.rangeMax - self.rangeMin) + self.rangeMin
+        return mapped_value
+
+    def updateTarget(self, x, y):
+        cmds.setAttr("{}.{}".format(self.target, self.attribute1), self.setRange(x))
+        cmds.setAttr("{}.{}".format(self.target, self.attribute2), self.setRange(y))
+
+    def mouseMoveEvent(self, event):
+        self.updateTarget(self.circle_pos.x(),self.circle_pos.y())
+        if self.dragging:
+            center = QPointF(self.ctrlRange, self.ctrlRange)
+            offset = QVector2D(QPointF(event.pos()) - center)  # Convert to QPoint here
+            if offset.length() > self.ctrlRange:
+                offset = offset.normalized() * self.ctrlRange
+            self.circle_pos = center + offset.toPointF()
+            self.update()
+
+    def mouseReleaseEvent(self, event):
+        self.dragging = False
