@@ -1,0 +1,24 @@
+from PySide2.QtWidgets import QApplication, QWidget, QVBoxLayout
+import circleJoystick  # Import the Joystick class
+import slider
+class MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Joystick Example")
+        self.setGeometry(100, 100, 300, 400)
+
+        # Create an instance of the Joystick
+        #target, attribute1, attribute2, rangeMin, rangeMax
+        self.joystickTranslate  = circleJoystick.Joystick("pCube1", "translateX", "translateZ", -50, 50)
+        #target, attribute, rangeMin, rangeMax)
+        self.slider1 = slider.Slider("pCube1", "rotateX", "rotateY", 0, 360, 23)
+
+        # Add the joystick to the main window layout (e.g., QVBoxLayout)
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(self.joystickTranslate)
+        self.layout.addWidget(self.slider1)
+        self.setLayout(self.layout)
+
+
+MainWindow = MainWindow()
+MainWindow.show()
